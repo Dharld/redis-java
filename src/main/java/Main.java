@@ -4,6 +4,37 @@ import java.net.Socket;
 import java.io.*;
 
 public class Main {
+  
+  public void process(Socket clientSocket) {
+    // Get the reader and the writer
+    try (BufferedWriter writer =
+                 new BufferedWriter(new OutputStreamWriter(clientSocket.getOutputStream()));
+         BufferedReader reader =
+                 new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
+    ) {
+
+      // String to keep track of the content
+      String content;
+
+      // Read the content and write +PONG to the client
+      while ((content = reader.readLine()) != null) {
+        System.out.println("Received: " + content);
+
+        if ("ping".equalsIgnoreCase(content)) {
+          writer.write("+PONG\r\n");
+          writer.flush();
+        } else if ("eof".equalsIgnoreCase(content)) {
+          // Close the connection
+          System.out.println("Closing the connection");
+        }
+
+      }
+    } catch (IOException e) {
+      System.out.println("IOException: " + e.getMessage());
+    }
+
+  }
+
   public static void main(String[] args){
     // You can use print statements as follows for debugging, they'll be visible when running tests.
     System.out.println("Logs from your program will appear here!");
