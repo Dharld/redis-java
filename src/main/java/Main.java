@@ -16,6 +16,10 @@ public class Main {
       serverSocket.setReuseAddress(true);
       // Wait for connection from client.
       clientSocket = serverSocket.accept();
+
+      // Get the output stream of the client socket and write on it
+      OutputStream out = clientSocket.getOutputStream();
+      out.write("PONG\r\n".getBytes());
     } catch (IOException e) {
       System.out.println("IOException: " + e.getMessage());
     } finally {
