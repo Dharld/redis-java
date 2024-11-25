@@ -26,7 +26,8 @@ public class Main {
         OutputStream out = clientSocket.getOutputStream();
         out.write("+PONG\r\n".getBytes());
 
-        out.flush();
+        // Close the client socket
+        clientSocket.close();
       }
 
 
