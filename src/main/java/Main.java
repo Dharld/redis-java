@@ -22,12 +22,20 @@ public class Main {
         // Accept the connection only once
         clientSocket = serverSocket.accept();
 
-        try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(clientSocket.getOutputStream()))) {
-          int pingCount = 0;
-          while (pingCount < 2) {
+        // Get the reader and the writer
+        try (BufferedWriter writer =
+                     new BufferedWriter(new OutputStreamWriter(clientSocket.getOutputStream()));
+             BufferedReader reader =
+                     new BufferedReader(new InputStreamReader(clientSocket.getInputStream()))) {
+        ) {
+
+          // String to keep track of the content
+          String content;
+
+          // Read the content and write +PONG to the client
+          while ((content = reader.readLine()) != null) {
             writer.write("+PONG\r\n");
             writer.flush();
-            pingCount++;
           }
         } catch (IOException e) {
           System.out.println("IOException: " + e.getMessage());
