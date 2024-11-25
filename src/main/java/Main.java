@@ -9,6 +9,7 @@ public class Main {
     ServerSocket serverSocket = null;
     Socket clientSocket = null;
     int port = 3000;
+
     try {
       serverSocket = new ServerSocket(port);
       // Since the tester restarts your program quite often, setting SO_REUSEADDR
