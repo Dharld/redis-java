@@ -1,6 +1,7 @@
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.io.OutputStream;
 
 public class Main {
   public static void main(String[] args){
@@ -8,7 +9,7 @@ public class Main {
     System.out.println("Logs from your program will appear here!");
     ServerSocket serverSocket = null;
     Socket clientSocket = null;
-    int port = 3000;
+    int port = 6379;
 
     try {
       serverSocket = new ServerSocket(port);
