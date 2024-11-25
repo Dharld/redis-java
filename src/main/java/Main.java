@@ -17,25 +17,22 @@ public class Main {
       // ensures that we don't run into 'Address already in use' errors
       serverSocket.setReuseAddress(true);
 
-
       // Continuously accept new connections
       while (true) {
         // Accept the connection only once
         clientSocket = serverSocket.accept();
 
-        // Get the output stream of the client socket with try-with-resources
-        try(OutputStream out = clientSocket.getOutputStream()) {
+        try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(clientSocket.getOutputStream()))) {
           int pingCount = 0;
-          while(pingCount < 2) {
-            out.write("+PONG\r\n".getBytes());
-            out.flush();
+          while (pingCount < 2) {
+            writer.write("+PONG\r\n");
+            writer.flush();
             pingCount++;
           }
         } catch (IOException e) {
           System.out.println("IOException: " + e.getMessage());
         }
       }
-
 
     } catch (IOException e) {
       System.out.println("IOException: " + e.getMessage());
