@@ -25,9 +25,11 @@ public class Main {
 
         // Get the output stream of the client socket with try-with-resources
         try(OutputStream out = clientSocket.getOutputStream()) {
-          while(true) {
+          int pingCount = 0;
+          while(pingCount < 2) {
             out.write("+PONG\r\n".getBytes());
             out.flush();
+            pingCount++;
           }
         } catch (IOException e) {
           System.out.println("IOException: " + e.getMessage());
