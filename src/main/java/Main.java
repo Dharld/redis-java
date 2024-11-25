@@ -20,6 +20,7 @@ public class Main {
       // Get the output stream of the client socket and write on it
       OutputStream out = clientSocket.getOutputStream();
       out.write("PONG\r\n".getBytes());
+
     } catch (IOException e) {
       System.out.println("IOException: " + e.getMessage());
     } finally {
