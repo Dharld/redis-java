@@ -20,12 +20,18 @@ public class Main {
 
       // Continuously accept new connections
       while (true) {
+        // Accept the connection only once
         clientSocket = serverSocket.accept();
 
-        // Get the output stream of the client socket and write on it
-        OutputStream out = clientSocket.getOutputStream();
-        out.write("+PONG\r\n".getBytes());
-        out.flush();
+        // Get the output stream of the client socket with try-with-resources
+        try(OutputStream out = clientSocket.getOutputStream()) {
+          while(true) {
+            out.write("+PONG\r\n".getBytes());
+            out.flush();
+          }
+        } catch (IOException e) {
+          System.out.println("IOException: " + e.getMessage());
+        }
       }
 
 
