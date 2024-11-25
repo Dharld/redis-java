@@ -26,7 +26,7 @@ public class Main {
         try (BufferedWriter writer =
                      new BufferedWriter(new OutputStreamWriter(clientSocket.getOutputStream()));
              BufferedReader reader =
-                     new BufferedReader(new InputStreamReader(clientSocket.getInputStream())))
+                     new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));)
         ) {
 
           // String to keep track of the content
