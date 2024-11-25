@@ -34,8 +34,16 @@ public class Main {
 
           // Read the content and write +PONG to the client
           while ((content = reader.readLine()) != null) {
-            writer.write("+PONG\r\n");
-            writer.flush();
+            System.out.println("Received: " + content);
+
+            if ("ping".equalsIgnoreCase(content)) {
+                writer.write("+PONG\r\n");
+                writer.flush();
+            } else if ("eof".equalsIgnoreCase(content)) {
+                // Close the connection
+                System.out.println("Closing the connection");
+            }
+
           }
         } catch (IOException e) {
           System.out.println("IOException: " + e.getMessage());
