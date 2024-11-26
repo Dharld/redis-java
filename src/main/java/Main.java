@@ -11,7 +11,6 @@ public class Main {
     // You can use print statements as follows for debugging, they'll be visible when running tests.
     System.out.println("Logs from your program will appear here!");
     ServerSocket serverSocket = null;
-    Socket clientSocket = null;
     int port = 6379;
 
     // Create a threadPool with a fixed number of threads
@@ -26,7 +25,7 @@ public class Main {
       // Continuously accept new connections
       while (true) {
         // Accept the connection only once
-        clientSocket = serverSocket.accept();
+        final Socket clientSocket = serverSocket.accept();
 
         // Span a new thread to process the connection
         threadPool.submit(() -> process(clientSocket));
@@ -35,13 +34,6 @@ public class Main {
     } catch (IOException e) {
       System.out.println("IOException: " + e.getMessage());
     } finally {
-      try {
-        if (clientSocket != null) {
-          clientSocket.close();
-        }
-      } catch (IOException e) {
-        System.out.println("IOException: " + e.getMessage());
-      }
       threadPool.shutdown();
     }
   }
@@ -72,6 +64,14 @@ public class Main {
       }
     } catch (IOException e) {
       System.out.println("IOException: " + e.getMessage());
+    } finally {
+        try {
+            if (clientSocket != null) {
+              clientSocket.close();
+            }
+        } catch (IOException e) {
+            System.out.println("IOException: " + e.getMessage());
+        }
     }
 
   }
