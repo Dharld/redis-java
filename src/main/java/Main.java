@@ -2,6 +2,8 @@ import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.io.*;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class Main {
 
@@ -11,6 +13,9 @@ public class Main {
     ServerSocket serverSocket = null;
     Socket clientSocket = null;
     int port = 6379;
+
+    // Create a threadPool with a fixed number of threads
+    ExecutorService threadPool = Executors.newFixedThreadPool(10);
 
     try {
       serverSocket = new ServerSocket(port);
@@ -22,7 +27,9 @@ public class Main {
       while (true) {
         // Accept the connection only once
         clientSocket = serverSocket.accept();
-        process(clientSocket)
+
+        // Span a new thread to process the connection
+        threadPool.submit(() -> process(clientSocket));
       }
 
     } catch (IOException e) {
@@ -35,10 +42,11 @@ public class Main {
       } catch (IOException e) {
         System.out.println("IOException: " + e.getMessage());
       }
+      threadPool.shutdown();
     }
   }
 
-  public void process(Socket clientSocket) {
+  public static void process(Socket clientSocket) {
     // Get the reader and the writer
     try (BufferedWriter writer =
                  new BufferedWriter(new OutputStreamWriter(clientSocket.getOutputStream()));
