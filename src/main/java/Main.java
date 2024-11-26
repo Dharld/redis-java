@@ -1,78 +1,66 @@
-import java.io.IOException;
+import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.io.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 public class Main {
 
-  public static void main(String[] args){
-    // You can use print statements as follows for debugging, they'll be visible when running tests.
-    System.out.println("Logs from your program will appear here!");
-    ServerSocket serverSocket = null;
-    int port = 6379;
+  private static final int PORT = 6379;
+  private static final String PING_COMMAND = "ping";
+  private static final String EOF_COMMAND = "eof";
 
-    // Create a threadPool with a fixed number of threads
+  public static void main(String[] args) {
+    System.out.println("Server started on port: " + PORT);
+
+    ServerSocket serverSocket = null;
     ExecutorService threadPool = Executors.newFixedThreadPool(10);
 
     try {
-      serverSocket = new ServerSocket(port);
-      // Since the tester restarts your program quite often, setting SO_REUSEADDR
-      // ensures that we don't run into 'Address already in use' errors
+      serverSocket = new ServerSocket(PORT);
       serverSocket.setReuseAddress(true);
 
-      // Continuously accept new connections
       while (true) {
-        // Accept the connection only once
         final Socket clientSocket = serverSocket.accept();
-
-        // Span a new thread to process the connection
         threadPool.submit(() -> process(clientSocket));
       }
 
     } catch (IOException e) {
-      System.out.println("IOException: " + e.getMessage());
+      System.err.println("IOException: " + e.getMessage());
     } finally {
-      threadPool.shutdown();
+      if (threadPool != null && !threadPool.isShutdown()) {
+        threadPool.shutdown();
+      }
     }
   }
 
-  public static void process(Socket clientSocket) {
-    // Get the reader and the writer
-    try (BufferedWriter writer =
-                 new BufferedWriter(new OutputStreamWriter(clientSocket.getOutputStream()));
-         BufferedReader reader =
-                 new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
-    ) {
+  private static void process(Socket clientSocket) {
+    try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(clientSocket.getOutputStream()));
+         BufferedReader reader = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()))) {
 
-      // String to keep track of the content
       String content;
-
-      // Read the content and write +PONG to the client
       while ((content = reader.readLine()) != null) {
         System.out.println("Received: " + content);
 
-        if ("ping".equalsIgnoreCase(content)) {
+        if (PING_COMMAND.equalsIgnoreCase(content)) {
           writer.write("+PONG\r\n");
           writer.flush();
-        } else if ("eof".equalsIgnoreCase(content)) {
-          // Close the connection
-          System.out.println("Closing the connection");
+        } else if (EOF_COMMAND.equalsIgnoreCase(content)) {
+          System.out.println("Closing the connection.");
+          break;
         }
-
       }
-    } catch (IOException e) {
-      System.out.println("IOException: " + e.getMessage());
-    } finally {
-        try {
-            if (clientSocket != null) {
-              clientSocket.close();
-            }
-        } catch (IOException e) {
-            System.out.println("IOException: " + e.getMessage());
-        }
-    }
 
+    } catch (IOException e) {
+      System.err.println("IOException: " + e.getMessage());
+    } finally {
+      try {
+        if (clientSocket != null) {
+          clientSocket.close();
+        }
+      } catch (IOException e) {
+        System.err.println("Failed to close socket: " + e.getMessage());
+      }
+    }
   }
 }
