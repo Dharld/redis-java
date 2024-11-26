@@ -42,13 +42,16 @@ public class Main {
       while ((content = reader.readLine()) != null) {
         System.out.println("Received: " + content);
 
-        if (PING_COMMAND.equalsIgnoreCase(content)) {
-          writer.write("+PONG\r\n");
-          writer.flush();
-        } else if (EOF_COMMAND.equalsIgnoreCase(content)) {
+        if (EOF_COMMAND.equalsIgnoreCase(content)) {
           System.out.println("Closing the connection.");
           break;
         }
+
+        String response = ProtocolParser.parse(content);
+
+        // Send the answer to the client
+        writer.write(response);
+        writer.flush();
       }
 
     } catch (IOException e) {
