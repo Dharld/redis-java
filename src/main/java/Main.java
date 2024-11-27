@@ -7,8 +7,6 @@ import java.util.concurrent.Executors;
 public class Main {
 
   private static final int PORT = 6379;
-  private static final String PING_COMMAND = "ping";
-  private static final String EOF_COMMAND = "eof";
 
   public static void main(String[] args) {
     System.out.println("Server started on port: " + PORT);
@@ -35,23 +33,20 @@ public class Main {
   }
 
   private static void process(Socket clientSocket) {
-    try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(clientSocket.getOutputStream()));
-         BufferedReader reader = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()))) {
+    try (OutputStream out = clientSocket.getOutputStream();
+         InputStream in = clientSocket.getInputStream();)
+    {
 
-      String content;
-      while ((content = reader.readLine()) != null) {
-        System.out.println("Received: " + content);
+      // Get the input stream
+      byte[] bytes = new byte[1024];
+      int bytesRead;
 
-        if (EOF_COMMAND.equalsIgnoreCase(content)) {
-          System.out.println("Closing the connection.");
-          break;
-        }
-
-        String response = ProtocolParser.parse(content);
-
-        // Send the answer to the client
-        writer.write(response);
-        writer.flush();
+      // Read just bytesRead element
+      while ((bytesRead = in.read(bytes)) != -1) {
+          String command = new String(bytes, 0, bytesRead);
+          String response = ProtocolParser.parse(command);
+          out.write(response.getBytes());
+          out.flush();
       }
 
     } catch (IOException e) {
