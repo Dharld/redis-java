@@ -26,26 +26,27 @@ public class RDBReader {
                     index += 1;
 
                     // Read the size of the first hashmap (2 bytes)
-                    int hashtableSize1 = ((fileContent[index] & 0xFF) << 8) | (fileContent[index + 1] & 0xFF);
+                    int hashtableSize1 = getHashmapSize(fileContent, index);
                     // Skip the associated byte
                     index += 1;
                     System.out.println("Size of first hashmap: " + hashtableSize1);
 
                     // Read the size of the second hashmap (2 bytes)
-                    int hashtableSize2 = ((fileContent[index] & 0xFF) << 8) | (fileContent[index + 1] & 0xFF);
+                    int hashtableSize2 = getHashmapSize(fileContent, index);
                     // Skip the associated byte
                     index += 1;
                     System.out.println("Size of second hashmap: " + hashtableSize2);
 
-                    // Read the type of value stored (1 byte)
-                    byte valueType = fileContent[index];
-                    // Skip the associated byte
-                    index += 1;
-                    System.out.println("Type of value stored: " + valueType);
+                    // Read the key-value pairs
+                    System.out.println("Reading key-value pairs for the first hashmap");
+                    for(int i = 0; i < hashtableSize1; i++) {
+                        // Read the key length (size-encoded)
+                        index = readKeyValuePair(fileContent, index);
+                    }
 
                     // Read the key-value pairs
-                    System.out.println("Reading key-value pairs");
-                    while (index < fileLength && fileContent[index] != (byte) 0xFF) {
+                    System.out.println("Reading key-value pairs for the second hashmap");
+                    for(int i = 0; i < hashtableSize2; i++) {
                         // Read the key length (size-encoded)
                         index = readKeyValuePair(fileContent, index);
                     }
@@ -55,7 +56,16 @@ public class RDBReader {
         }
     }
 
+    private static int getHashmapSize(byte[] buffer, int index) {
+        return buffer[index] & 0xFF;
+    }
     private static int readKeyValuePair(byte[] buffer, int index) {
+        // Read the type of value stored (1 byte)
+        byte valueType = buffer[index];
+        // Skip the associated byte
+        index += 1;
+        System.out.println("Type of value stored: " + valueType);
+
         // Read the key length (size-encoded)
         int keyLength = readSizeEncodedValue(buffer, index);
         index += getSizeEncodedLength(buffer[index]);
@@ -76,21 +86,23 @@ public class RDBReader {
         System.out.printf("Key: %s, Value: %s%n", key, value);
 
 
-        // Store the key-value pair in the cache
-        Cache.getInstance().set(key, value);
+        if(!key.isEmpty() && !value.isEmpty()) {
+            // Store the key-value pair in the cache
+            Cache.getInstance().set(key, value);
+        }
 
         return index;
     }
 
     private static int readSizeEncodedValue(byte[] buffer, int index) {
-        int firstByte = buffer[index] & 0xFF;
+        byte firstByte = buffer[index];
         int size;
 
-        // 00C0(1100 0000)
+        // 00C0 (1100 0000)
         // firstByte & 0xC0 is used to consider only the first 2 bits of the byte
         if ((firstByte & 0xC0) == 0x00) {
             // 00xxxxxx
-            // 3F(0011 1111) is used to
+            // 3F (0011 1111) is used to mask the lower 6 bits
             size = firstByte & 0x3F;
         } else if ((firstByte & 0xC0) == 0x40) {
             // 01xxxxxx xxxxxxxx

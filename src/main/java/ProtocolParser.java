@@ -19,7 +19,7 @@ public class ProtocolParser {
     private static final Cache redisServer = Cache.getInstance();
 
     // Get the persistent storage instance
-    private static final PersistentStorage persistentStorage = PersistentStorage.getInstance();
+    private static final Config CONFIG = Config.getInstance();
 
     public static String parse(String command) {
         logger.info("Received command: " + command);
@@ -152,7 +152,7 @@ public class ProtocolParser {
 
         // If the command is GET
         if (command.equalsIgnoreCase("GET")) {
-            String value = persistentStorage.getConfig(parameter);
+            String value = CONFIG.getConfig(parameter);
 
             // If there's no value associated with the parameter
             if (value == null) {

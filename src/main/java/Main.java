@@ -26,8 +26,8 @@ public class Main {
       System.out.println("Reading RDB file: " + dbfilename + " in directory: " + dir);
 
       // Set the parameters in the persistent storage
-      PersistentStorage.getInstance().setConfig("dir", dir);
-      PersistentStorage.getInstance().setConfig("dbfilename", dbfilename);
+      Config.getInstance().setConfig("dir", dir);
+      Config.getInstance().setConfig("dbfilename", dbfilename);
 
       // Read the RDB file
         try {

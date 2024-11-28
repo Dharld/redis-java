@@ -24,13 +24,13 @@ public class Cache {
     }
 
     public void set(String key, String value) {
-        logger.info("Setting key: " + key + " to value: " + value);
+//        logger.info("Setting key: " + key + " to value: " + value);
 
         // Store the key-value pair
         this.store.put(key, value);
 
-        logger.info("Store after setting key: " + key + " to value: " + value);
-        this.printStore();
+//        logger.info("Store after setting key: " + key + " to value: " + value);
+//        this.printStore();
     }
 
     public void setWithTTL(String key, String value, long ttl, TimeUnit unit) {
@@ -39,18 +39,17 @@ public class Cache {
 
         // Schedule the removal of the key after TTL
         scheduler.schedule(() -> {
-            logger.info("Removing key: " + key + " after TTL");
+//            logger.info("Removing key: " + key + " after TTL");
             store.remove(key);
         }, ttl, unit);
     }
 
     public String get(String key) {
-        logger.info("Getting key: " + key);
         return this.store.get(key);
     }
 
     public String[] keys() {
-        logger.info("Getting all keys");
+//        logger.info("Getting all keys");
         return store.keySet().toArray(new String[0]);
     }
 
