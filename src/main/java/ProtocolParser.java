@@ -12,9 +12,13 @@ public class ProtocolParser {
     private static final String PING_COMMAND = "PING";
     private static final String GET_COMMAND = "GET";
     private static final String SET_COMMAND = "SET";
+    private static final String CONFIG_COMMAND = "CONFIG";
 
     // Get the singleton instance of the RedisServer
-    private static final RedisServer redisServer = RedisServer.getInstance();
+    private static final Cache redisServer = Cache.getInstance();
+
+    // Get the persistent storage instance
+    private static final PersistentStorage persistentStorage = PersistentStorage.getInstance();
 
     public static String parse(String command) {
         logger.info("Received command: " + command);
@@ -41,9 +45,14 @@ public class ProtocolParser {
         else if (uppercasedCommand.contains(ECHO_COMMAND)) {
             return handleEchoCommand(parts);
         }
+        else if (uppercasedCommand.contains(CONFIG_COMMAND)) {
+            return handleConfigCommand(parts);
+        }
+
         else if (uppercasedCommand.contains(GET_COMMAND)) {
             return handleGetCommand(parts);
         }
+
         else if (uppercasedCommand.contains(SET_COMMAND)) {
             return handleSetCommand(parts);
         }
@@ -62,38 +71,36 @@ public class ProtocolParser {
         logger.info("Handling SET command with parts: " + Arrays.toString(parts));
 
         // Get the key length and the key
-        int keyLength = Integer.parseInt(parts[0].substring(1));
+        // int keyLength = Integer.parseInt(parts[0].substring(1));
         String key = parts[1];
-        logger.info("Key: " + key + ", Key length: " + keyLength);
+        logger.info("Key: " + key);
 
-        // Get the value length and the value
-        int valueLength = Integer.parseInt(parts[2].substring(1));
         String value = parts[3];
-        logger.info("Value: " + value + ", Value length: " + valueLength);
+        logger.info("Value: " + value);
 
         // Handle the expiry parameter
         if (parts.length > 7) {
+            // Get the expiry parameter
             String parameter = parts[5];
             if (parameter.equalsIgnoreCase("px")) {
                 logger.info("Expiry parameter detected: " + parameter);
 
                 // Get the expiry time
-                int expiryLength = Integer.parseInt(parts[6].substring(1));
-                int expiryTime = Integer.parseInt(parts[7].substring(0, expiryLength));
+                // int expiryLength = Integer.parseInt(parts[6].substring(1));
+                int expiryTime = Integer.parseInt(parts[7]);
 
-                logger.info("Parsed expiry length: " + expiryLength);
                 logger.info("Parsed expiry time: " + expiryTime + " milliseconds");
 
-                redisServer.setWithTTL(key.substring(0, keyLength), value.substring(0, valueLength), expiryTime, TimeUnit.MILLISECONDS);
+                redisServer.setWithTTL(key, value, expiryTime, TimeUnit.MILLISECONDS);
 
-                logger.info("Set key with TTL: key=" + key.substring(0, keyLength) + ", value=" + value.substring(0, valueLength) + ", ttl=" + expiryTime + " milliseconds");
+                logger.info("Set key with TTL: key=" + key + ", value=" + value + ", ttl=" + expiryTime + " milliseconds");
 
                 return "+OK\r\n";
             }
         }
 
         // Set the key and value in the RedisServer
-        redisServer.set(key.substring(0, keyLength), value.substring(0, valueLength));
+        redisServer.set(key, value);
 
         // Return the response to the user
         return "+OK\r\n";
@@ -103,11 +110,12 @@ public class ProtocolParser {
         logger.info("Handling GET command with parts: " + Arrays.toString(parts));
 
         // Get the key length and the key
-        int keyLength = Integer.parseInt(parts[0].substring(1));
+        // int keyLength = Integer.parseInt(parts[0].substring(1));
         String key = parts[1];
-        logger.info("Key: " + key + ", Key length: " + keyLength);
+        logger.info("Key: " + key);
 
-        String value = redisServer.get(key.substring(0, keyLength));
+        // Get the value associated to the key
+        String value = redisServer.get(key);
 
         // Return the response to the user
         if (value == null) {
@@ -122,17 +130,35 @@ public class ProtocolParser {
     private static String handleEchoCommand(String[] parts) {
         logger.info("Handling ECHO command with parts: " + Arrays.toString(parts));
 
-        // Get the second to last part and parse it to integer
-        String secondToLastPart = parts[parts.length - 2];
-        int numCharacters = Integer.parseInt(secondToLastPart.substring(1));
-        logger.info("Number of characters: " + numCharacters);
-
         // Return the numCharacters first characters of the last part
         String lastPart = parts[parts.length - 1];
-        String result = lastPart.substring(0, numCharacters);
-        logger.info("Echo result: " + result);
 
-        return "$" + numCharacters + "\r\n" + result + "\r\n";
+        logger.info("Echo result: " + lastPart);
+
+        return "$" + lastPart.length() + "\r\n" + lastPart + "\r\n";
+    }
+
+    private static String handleConfigCommand(String[] parts) {
+        logger.info("Handling CONFIG command with parts: " + Arrays.toString(parts));
+
+        // Get the command and parameter ([$3, GET, $3, dir])
+        String command = parts[1];
+        String parameter = parts[3];
+
+        // If the command is GET
+        if (command.equalsIgnoreCase("GET")) {
+            String value = persistentStorage.getConfig(parameter);
+
+            // If there's no value associated with the parameter
+            if (value == null) {
+                return "$-1\r\n";
+            }
+
+            // Return the response to the user in RESP format
+            return String.format("*2\r\n$%d\r\n%s\r\n$%d\r\n%s\r\n", parameter.length(), parameter, value.length(), value);
+        }
+
+        return "-ERR unknown command";
     }
 
     private static String handleUnknownCommand() {
