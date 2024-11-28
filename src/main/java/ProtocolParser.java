@@ -13,6 +13,7 @@ public class ProtocolParser {
     private static final String GET_COMMAND = "GET";
     private static final String SET_COMMAND = "SET";
     private static final String CONFIG_COMMAND = "CONFIG";
+    private static final String KEY_COMMAND = "KEYS";
 
     // Get the singleton instance of the RedisServer
     private static final Cache redisServer = Cache.getInstance();
@@ -55,6 +56,10 @@ public class ProtocolParser {
 
         else if (uppercasedCommand.contains(SET_COMMAND)) {
             return handleSetCommand(parts);
+        }
+
+        else if (uppercasedCommand.contains(KEY_COMMAND)) {
+            return handleKeyCommand(parts);
         }
         // Check if the command contains an unknown command
         else {
@@ -151,7 +156,7 @@ public class ProtocolParser {
 
             // If there's no value associated with the parameter
             if (value == null) {
-                return "$-1\r\n";
+                return "*-1\r\n";
             }
 
             // Return the response to the user in RESP format
@@ -159,6 +164,31 @@ public class ProtocolParser {
         }
 
         return "-ERR unknown command";
+    }
+
+    private static String handleKeyCommand(String[] parts) {
+        logger.info("Handling KEYS command with parts: " + Arrays.toString(parts));
+
+        // Get the pattern to match
+        String pattern = parts[1];
+
+        // Get all the keys that match the pattern
+        String[] keys = Cache.getInstance().keys();
+
+        System.out.println("Showing all keys: ");
+        // Testing all the keys
+        for (String key : keys) {
+            logger.info("Key: " + key);
+        }
+
+        // Filter the keys that match the pattern
+        String filteredKeys = Arrays.stream(keys)
+                .reduce("", (acc, key) -> acc + "$" + key.length() + "\r\n" + key + "\r\n");
+
+        logger.info("Filtered keys: " + filteredKeys);
+
+        // Return the response to the user using this format "*1\r\n$3\r\nfoo\r\n"
+        return String.format("*%d\r\n%s", keys.length, filteredKeys);
     }
 
     private static String handleUnknownCommand() {

@@ -49,6 +49,11 @@ public class Cache {
         return this.store.get(key);
     }
 
+    public String[] keys() {
+        logger.info("Getting all keys");
+        return store.keySet().toArray(new String[0]);
+    }
+
     private void printStore() {
         for (Map.Entry<String, String> entry : store.entrySet()) {
             logger.info("Key: " + entry.getKey() + " Value: " + entry.getValue());
