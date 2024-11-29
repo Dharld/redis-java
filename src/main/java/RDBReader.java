@@ -1,4 +1,5 @@
 import java.io.*;
+import java.util.concurrent.TimeUnit;
 
 public class RDBReader {
 
@@ -21,50 +22,131 @@ public class RDBReader {
             System.out.println("File length: " + fileLength);
 
             while (index < fileLength) {
-                if (fileContent[index] == (byte) 0xFB) {
+                byte firstByte = fileContent[index];
+
+                if (firstByte == (byte) 0xFB) {
                     // Skip FB
-                    index += 1;
+                    System.out.println("Skip FB");
+                    index++;
 
                     // Read the size of the first hashmap (2 bytes)
-                    int hashtableSize1 = getHashmapSize(fileContent, index);
-                    // Skip the associated byte
-                    index += 1;
+                    int hashtableSize1 = fileContent[index] & 0xFF;
+                    index++;
                     System.out.println("Size of first hashmap: " + hashtableSize1);
 
                     // Read the size of the second hashmap (2 bytes)
-                    int hashtableSize2 = getHashmapSize(fileContent, index);
-                    // Skip the associated byte
-                    index += 1;
+                    int hashtableSize2 = fileContent[index] & 0xFF;
+                    index++;
                     System.out.println("Size of second hashmap: " + hashtableSize2);
 
-                    // Read the key-value pairs
-                    System.out.println("Reading key-value pairs for the first hashmap");
-                    for(int i = 0; i < hashtableSize1; i++) {
-                        // Read the key length (size-encoded)
-                        index = readKeyValuePair(fileContent, index);
+                    // Read all the different characters
+                    while (index < fileLength) {
+                        firstByte = fileContent[index];
+                        if (firstByte == (byte) 0xFF) {
+                            System.out.println("Encountered 0xFF, stopping iteration");
+                            break;
+                        }
+                        else if (firstByte == (byte) 0xFC || firstByte == (byte) 0xFD) {
+                            index = readKeyValuePairWithExpiration(fileContent, index);
+                        } else {
+                            index = readKeyValuePair(fileContent, index);
+                        }
                     }
 
-                    // Read the key-value pairs
-                    System.out.println("Reading key-value pairs for the second hashmap");
-                    for(int i = 0; i < hashtableSize2; i++) {
-                        // Read the key length (size-encoded)
-                        index = readKeyValuePair(fileContent, index);
-                    }
+                } else {
+                    index++;
                 }
-                index++;
+
             }
         }
     }
 
-    private static int getHashmapSize(byte[] buffer, int index) {
-        return buffer[index] & 0xFF;
+    private static int readKeyValuePairWithExpiration(byte[] buffer, int index) {
+        long expireTimestamp = -1;
+        boolean isMilliseconds = false;
+
+        // If the time is expressed in seconds
+        if (buffer[index] == (byte) 0xFC) {
+            // Time is gonna be given in milliseconds
+            isMilliseconds = true;
+            // Skip FC byte
+            System.out.println("Skip FC");
+            index++;
+            // Read the timestamp
+            expireTimestamp = readLong(buffer, index);
+            System.out.println("Expire timestamp: " + expireTimestamp);
+            index += 8;
+        } else if (buffer[index] == (byte) 0xFD) {
+            // Skip the FD byte
+            index++;
+            System.out.println("Skip FD");
+
+            // Read the timestamp
+            expireTimestamp = readInt(buffer, index);
+            System.out.println("Expire timestamp: " + expireTimestamp);
+            index += 4;
+        }
+
+        // Skip the type of value stored
+        byte valueType = buffer[index];
+        index++;
+
+        // Read the key length
+        int keyLength = readSizeEncodedValue(buffer, index);
+        index += getSizeEncodedLength(buffer[index]);
+
+        // Read the key
+        String key = new String(buffer, index, keyLength);
+        index += keyLength;
+
+        // Read the value length
+        int valueLength = readSizeEncodedValue(buffer, index);
+        index += getSizeEncodedLength(buffer[index]);
+
+        // Read the value
+        String value = new String(buffer, index, valueLength);
+        index += valueLength;
+
+        System.out.printf("Key: %s, Value: %s%n", key, value);
+
+        // Store the key-value pair in the cache with expiry
+        if (!key.isEmpty() && !value.isEmpty()) {
+            Cache.getInstance().setWithTTL(key, value, expireTimestamp, isMilliseconds ? TimeUnit.MILLISECONDS : TimeUnit.SECONDS);
+        }
+
+        // For simple delimiter just proceed to the next key-value pair
+        if (index < buffer.length && buffer[index] == (byte) 0x00) {
+            index++;
+        }
+
+        return index;
     }
+
+    private static long readLong(byte[] buffer, int index) {
+        return ((buffer[index] & 0xFFL)) |
+                ((buffer[index + 1] & 0xFFL) << 8) |
+                ((buffer[index + 2] & 0xFFL) << 16) |
+                ((buffer[index + 3] & 0xFFL) << 24) |
+                ((buffer[index + 4] & 0xFFL) << 32) |
+                ((buffer[index + 5] & 0xFFL) << 40) |
+                ((buffer[index + 6] & 0xFFL) << 48) |
+                ((buffer[index + 7] & 0xFFL) << 56);
+    }
+
+    private static int readInt(byte[] buffer, int index) {
+        return ((buffer[index] & 0xFF)) |
+                ((buffer[index + 1] & 0xFF) << 8) |
+                ((buffer[index + 2] & 0xFF) << 16) |
+                ((buffer[index + 3] & 0xFF) << 24);
+    }
+
+
     private static int readKeyValuePair(byte[] buffer, int index) {
         // Read the type of value stored (1 byte)
         byte valueType = buffer[index];
         // Skip the associated byte
         index += 1;
-        System.out.println("Type of value stored: " + valueType);
+        System.out.println("Skip 00");
 
         // Read the key length (size-encoded)
         int keyLength = readSizeEncodedValue(buffer, index);
