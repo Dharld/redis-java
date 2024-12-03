@@ -16,7 +16,7 @@ public class ProtocolParser {
     private static final String KEY_COMMAND = "KEYS";
 
     // Get the singleton instance of the RedisServer
-    private static final Cache redisServer = Cache.getInstance();
+    private static final Database redisServer = Database.getInstance();
 
     // Get the persistent storage instance
     private static final Config CONFIG = Config.getInstance();
@@ -96,7 +96,11 @@ public class ProtocolParser {
 
                 logger.info("Parsed expiry time: " + expiryTime + " milliseconds");
 
-                redisServer.setWithTTL(key, value, expiryTime, TimeUnit.MILLISECONDS);
+                // Get the current time
+                long currentTime = System.currentTimeMillis();
+                long expiryTimestamp = currentTime + expiryTime;
+
+                redisServer.setWithExpiry(key, value, expiryTimestamp);
 
                 logger.info("Set key with TTL: key=" + key + ", value=" + value + ", ttl=" + expiryTime + " milliseconds");
 
@@ -167,13 +171,18 @@ public class ProtocolParser {
     }
 
     private static String handleKeyCommand(String[] parts) {
-        logger.info("Handling KEYS command with parts: " + Arrays.toString(parts));
+        logger.info("Handling KEYS command with * parts: " + Arrays.toString(parts));
+        logger.info("Test");
 
         // Get the pattern to match
         String pattern = parts[1];
 
+        logger.info("Getting keys");
         // Get all the keys that match the pattern
-        String[] keys = Cache.getInstance().keys();
+        String[] keys = redisServer.keys();
+
+        logger.info("Got keys");
+        logger.info("Keys: " + Arrays.toString(keys));
 
         System.out.println("Showing all keys: ");
         // Testing all the keys

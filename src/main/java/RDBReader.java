@@ -1,221 +1,237 @@
 import java.io.*;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.logging.Logger;
 
 public class RDBReader {
+    public static Map<String, String> metadata = new HashMap<>();
+    public static Database database = Database.getInstance();
+    public static Logger logger = Logger.getLogger(RDBReader.class.getName());
 
-    public static void readRDBFile(String dir, String filename) throws IOException {
-        File file = new File(dir, filename);
-        try (FileInputStream fis = new FileInputStream(file)) {
-            byte[] buffer = new byte[4096];
-            int bytesRead;
-            int index = 0;
-            ByteArrayOutputStream baos = new ByteArrayOutputStream();
 
-            while ((bytesRead = fis.read(buffer)) != -1) {
-                baos.write(buffer, 0, bytesRead);
+    public static void readRDBFile(String dir, String dbfilename) throws IOException {
+        // Create the database
+        // createFile(testData);
+
+        File file = new File(dir + "/" + dbfilename);
+
+        try(FileInputStream fis = new FileInputStream(file)) {
+            // Read the header
+            String header = readHeader(fis);
+            logger.info("This is the header: " + header);
+
+            // Test the current byte
+            // int currentByte = fis.read();
+            // logger.info(String.format("Current byte: 0x%02X", currentByte));
+
+            // Read the metadata
+            readMetadata(fis);
+
+            // Test the metadata
+            metadata.forEach((key, value) -> {
+                logger.info("Key: " + key + ", Value: " + value);
+            });
+
+            // Read the index
+            readIndex(fis);
+
+            // Read the data
+            getData(fis);
+
+        } catch(IOException e) {
+            // Throw meaningful exception
+            e.printStackTrace();
+            // throw new RuntimeException("Error reading the RDB file");
+        }
+
+    }
+
+    private static void getData(FileInputStream fis) throws IOException {
+
+        // Read the next value FB
+        byte currentByte = (byte) fis.read();
+        logger.info(String.format("Start Byte: 0x%02X", currentByte));
+
+        // Read until we reach FF
+        while(currentByte != (byte) 0xFF) {
+            // Start reading data if we reach FB
+
+            if(currentByte == (byte) 0xFB) {
+                readData(fis);
             }
 
-            byte[] fileContent = baos.toByteArray();
-            index = 0;
-            int fileLength = fileContent.length;
-
-            System.out.println("File length: " + fileLength);
-
-            while (index < fileLength) {
-                byte firstByte = fileContent[index];
-
-                if (firstByte == (byte) 0xFB) {
-                    // Skip FB
-                    System.out.println("Skip FB");
-                    index++;
-
-                    // Read the size of the first hashmap (2 bytes)
-                    int hashtableSize1 = fileContent[index] & 0xFF;
-                    index++;
-                    System.out.println("Size of first hashmap: " + hashtableSize1);
-
-                    // Read the size of the second hashmap (2 bytes)
-                    int hashtableSize2 = fileContent[index] & 0xFF;
-                    index++;
-                    System.out.println("Size of second hashmap: " + hashtableSize2);
-
-                    // Read all the different characters
-                    while (index < fileLength) {
-                        firstByte = fileContent[index];
-                        if (firstByte == (byte) 0xFF) {
-                            System.out.println("Encountered 0xFF, stopping iteration");
-                            break;
-                        }
-                        else if (firstByte == (byte) 0xFC || firstByte == (byte) 0xFD) {
-                            index = readKeyValuePairWithExpiration(fileContent, index);
-                        } else {
-                            index = readKeyValuePair(fileContent, index);
-                        }
-                    }
-
-                } else {
-                    index++;
-                }
-
-            }
+            currentByte = (byte) fis.read();
         }
     }
 
-    private static int readKeyValuePairWithExpiration(byte[] buffer, int index) {
-        long expireTimestamp = -1;
-        boolean isMilliseconds = false;
+    private static void readIndex(FileInputStream fis) throws IOException {
+        // Read the index
+        int dbIndex = fis.read();
+        logger.info("Database index: " + dbIndex);
 
-        // If the time is expressed in seconds
-        if (buffer[index] == (byte) 0xFC) {
-            // Time is gonna be given in milliseconds
-            isMilliseconds = true;
-            // Skip FC byte
-            System.out.println("Skip FC");
-            index++;
-            // Read the timestamp
-            expireTimestamp = readLong(buffer, index);
-            System.out.println("Expire timestamp: " + expireTimestamp);
-            index += 8;
-        } else if (buffer[index] == (byte) 0xFD) {
-            // Skip the FD byte
-            index++;
-            System.out.println("Skip FD");
+        database.setId(dbIndex);
+    }
 
-            // Read the timestamp
-            expireTimestamp = readInt(buffer, index);
-            System.out.println("Expire timestamp: " + expireTimestamp);
-            index += 4;
+    private static void readData(FileInputStream fis) throws IOException {
+        // Read the two hashmaps size
+        long h1Size = Decoder.getSize(fis);
+        long h2Size = Decoder.getSize(fis);
+
+        logger.info("Hashmap 1 size: " + h1Size);
+        logger.info("Hashmap 2 size: " + h2Size);
+
+
+        boolean isFirstHashmap = true;
+
+        // Continuously read the key-value pairs until we reach the byte FF
+        int currentByte = fis.read();
+        printByteString((byte) currentByte);
+
+
+        long timestamp = 0;
+        boolean isMillisecond = false;
+
+        while (currentByte != 0xFF) {
+
+            // Time is in milliseconds, and value is stored in the first hashmap
+            if (currentByte == 0xFC || currentByte == 0xFD) {
+                isFirstHashmap = false;
+                isMillisecond = currentByte == 0xFC;
+                timestamp = currentByte == 0xFD ? readInt(fis) : readLong(fis);
+                logger.info("Timestamp: " + timestamp);
+            }
+
+            // Read the key value pair
+            if (isFirstHashmap) {
+                readDatabaseData(fis);
+            } else {
+                readDatabaseDataWithExpiry(fis, timestamp, isMillisecond);
+            }
+
+            // Read the next byte
+            currentByte = fis.read();
+
         }
 
-        // Skip the type of value stored
-        byte valueType = buffer[index];
-        index++;
+    }
+
+    private static void printByteString(byte b) {
+        logger.info(String.format("Current byte: 0x%02X", b));
+    }
+
+    private static void readDatabaseData(FileInputStream fis) throws IOException {
 
         // Read the key length
-        int keyLength = readSizeEncodedValue(buffer, index);
-        index += getSizeEncodedLength(buffer[index]);
+        String key = Decoder.getData(fis);
+        logger.info("Key: " + key);
 
-        // Read the key
-        String key = new String(buffer, index, keyLength);
-        index += keyLength;
+        String value = Decoder.getData(fis);
+        logger.info("Value: " + value);
 
-        // Read the value length
-        int valueLength = readSizeEncodedValue(buffer, index);
-        index += getSizeEncodedLength(buffer[index]);
+        // Store the key-value pair
+        database.set(key, value);
+        logger.info("Key-value pair: stored");
+    }
 
-        // Read the value
-        String value = new String(buffer, index, valueLength);
-        index += valueLength;
+    private static void readDatabaseDataWithExpiry(FileInputStream fis, long timestamp, boolean isMillisecond) throws IOException {
+        int type = fis.read();
+        logger.info("Type: " + type);
 
-        System.out.printf("Key: %s, Value: %s%n", key, value);
+        // Read the key length
+        String key = Decoder.getData(fis);
+        logger.info("Key: " + key);
 
-        // Store the key-value pair in the cache with expiry
-        if (!key.isEmpty() && !value.isEmpty()) {
-            Cache.getInstance().setWithTTL(key, value, expireTimestamp, isMilliseconds ? TimeUnit.MILLISECONDS : TimeUnit.SECONDS);
+        String value = Decoder.getData(fis);
+        logger.info("Value: " + value);
+
+
+        TimeUnit unit = isMillisecond ? TimeUnit.MILLISECONDS : TimeUnit.SECONDS;
+
+        // Store the key-value pair
+        database.setWithExpiry(key, value, timestamp, unit);
+        logger.info("Key-value pair with expiry: stored");
+    }
+
+    private static int readInt(FileInputStream fis) throws IOException {
+        // Read 4 bytes
+        byte[] bytes = new byte[4];
+        fis.read(bytes);
+
+        ByteBuffer buffer = ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN);
+        return buffer.getInt();
+    }
+
+    private static long readLong(FileInputStream fis) throws IOException {
+        // Read 8 bytes
+        byte[] bytes = new byte[8];
+        fis.read(bytes);
+
+        ByteBuffer buffer = ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN);
+        return buffer.getLong();
+    }
+
+    public static void createFile(byte[] data) {
+        // Create a file with the given data
+        File file = new File("data.dat");
+
+        try(FileOutputStream fos = new FileOutputStream(file)) {
+            for (byte b : data) {
+                fos.write(b);
+            }
+        } catch(IOException e) {
+            throw new RuntimeException();
         }
 
-        // For simple delimiter just proceed to the next key-value pair
-        if (index < buffer.length && buffer[index] == (byte) 0x00) {
-            index++;
-        }
-
-        return index;
     }
 
-    private static long readLong(byte[] buffer, int index) {
-        return ((buffer[index] & 0xFFL)) |
-                ((buffer[index + 1] & 0xFFL) << 8) |
-                ((buffer[index + 2] & 0xFFL) << 16) |
-                ((buffer[index + 3] & 0xFFL) << 24) |
-                ((buffer[index + 4] & 0xFFL) << 32) |
-                ((buffer[index + 5] & 0xFFL) << 40) |
-                ((buffer[index + 6] & 0xFFL) << 48) |
-                ((buffer[index + 7] & 0xFFL) << 56);
+    public static String readHeader(FileInputStream fis) throws IOException {
+        // The header is composed of: Magic String + Version
+        // Magic String: 6 bytes
+        // Version: 3 bytes
+        // String: REDIS001
+
+        byte[] header = new byte[9];
+        fis.read(header);
+
+        // Convert the header to a String
+        return new String(header);
     }
 
-    private static int readInt(byte[] buffer, int index) {
-        return ((buffer[index] & 0xFF)) |
-                ((buffer[index + 1] & 0xFF) << 8) |
-                ((buffer[index + 2] & 0xFF) << 16) |
-                ((buffer[index + 3] & 0xFF) << 24);
-    }
+    private static void readMetadata(FileInputStream fis) throws IOException {
+        // FA                             // Indicates the start of a metadata subsection.
+        // 09 72 65 64 69 73 2D 76 65 72  // The name of the metadata attribute (string encoded): "redis-ver".
+        // 06 36 2E 30 2E 31 36 FA
+
+        // Skip the FA byte
+        int currentByte = fis.read();
 
 
-    private static int readKeyValuePair(byte[] buffer, int index) {
-        // Read the type of value stored (1 byte)
-        byte valueType = buffer[index];
-        // Skip the associated byte
-        index += 1;
-        System.out.println("Skip 00");
-
-        // Read the key length (size-encoded)
-        int keyLength = readSizeEncodedValue(buffer, index);
-        index += getSizeEncodedLength(buffer[index]);
-
-        // Read the key (keyLength bytes)
-        String key = new String(buffer, index, keyLength);
-        index += keyLength;
-
-        // Read the value length (size-encoded)
-        int valueLength = readSizeEncodedValue(buffer, index);
-        index += getSizeEncodedLength(buffer[index]);
-
-        // Read the value (valueLength bytes)
-        String value = new String(buffer, index, valueLength);
-        index += valueLength;
-
-        // Print the parsed key and value
-        System.out.printf("Key: %s, Value: %s%n", key, value);
-
-
-        if(!key.isEmpty() && !value.isEmpty()) {
-            // Store the key-value pair in the cache
-            Cache.getInstance().set(key, value);
-        }
-
-        return index;
-    }
-
-    private static int readSizeEncodedValue(byte[] buffer, int index) {
-        byte firstByte = buffer[index];
-        int size;
-
-        // 00C0 (1100 0000)
-        // firstByte & 0xC0 is used to consider only the first 2 bits of the byte
-        if ((firstByte & 0xC0) == 0x00) {
-            // 00xxxxxx
-            // 3F (0011 1111) is used to mask the lower 6 bits
-            size = firstByte & 0x3F;
-        } else if ((firstByte & 0xC0) == 0x40) {
-            // 01xxxxxx xxxxxxxx
-            size = ((firstByte & 0x3F) << 8) | (buffer[index + 1] & 0xFF);
-        } else if ((firstByte & 0xC0) == 0x80) {
-            // 10xxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx
-            size = ((buffer[index + 1] & 0xFF) << 24) | ((buffer[index + 2] & 0xFF) << 16) |
-                    ((buffer[index + 3] & 0xFF) << 8) | (buffer[index + 4] & 0xFF);
-        } else {
-            // 11xxxxxx (string encoding type)
-            size = handleStringEncoding(buffer, index);
-        }
-
-        return size;
-    }
-
-    private static int handleStringEncoding(byte[] buffer, int index) {
-        // Handle string encoding types here
-        // For this example, we'll just throw an exception
-        throw new IllegalArgumentException("String encoding type not supported in this example");
-    }
-
-    private static int getSizeEncodedLength(byte firstByte) {
-        if ((firstByte & 0xC0) == 0x00) {
-            return 1;
-        } else if ((firstByte & 0xC0) == 0x40) {
-            return 2;
-        } else if ((firstByte & 0xC0) == 0x80) {
-            return 5;
-        } else {
-            return 1; // For string encoding type, return 1 for now
+        // Read the key-value pairs until we reach the byte FE
+        while (currentByte !=  0xFE) {
+            if(currentByte ==  0xFA) {
+                // Read the metadata line
+                readMetadataLine(fis);
+            }
+            // Read the next byte
+            currentByte = fis.read();
+//            logger.info("Current byte: " + currentByte);
         }
     }
+
+    private static void readMetadataLine(FileInputStream fis) throws IOException {
+        // Read the key length
+        String key = Decoder.getData(fis);
+        logger.info("Key: " + key);
+
+        String value = Decoder.getData(fis);
+        logger.info("Value: " + value);
+
+        // Store the key-value pair
+        metadata.put(key, value);
+        logger.info("Key-value pair: stored");
+    }
+
 }
