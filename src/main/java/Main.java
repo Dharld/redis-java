@@ -7,36 +7,33 @@ import java.util.logging.Logger;
 
 public class Main {
 
-  private static final int PORT = 6379;
-  private static final Logger logger = Logger.getLogger(Main.class.getName());
+    private static final Logger logger = Logger.getLogger(Main.class.getName());
 
   public static void main(String[] args) {
-    System.out.println("Server started on port: " + PORT);
-
-    // Check if the number of arguments is correct
+    int PORT = (args.length > 0 && args.length < 3) ? Integer.parseInt(args[1]) : 6379;
+    // Check if the arguments are more than 3
     if (args.length > 3) {
-      // Get the dir and dbfilename parameters
-      String dir = args[1];
-      String dbfilename = args[3];
+        // Get the dir and dbfilename parameters
+        String dir = args[1];
+        String dbfilename = args[3];
 
-      // Log the two parameters
-      logger.config("dir: " + dir);
-      logger.config("dbfilename: " + dbfilename);
+        // Log the two parameters
+        logger.config("dir: " + dir);
+        logger.config("dbfilename: " + dbfilename);
 
-      System.out.println("Reading RDB file: " + dbfilename + " in directory: " + dir);
+        System.out.println("Reading RDB file: " + dbfilename + " in directory: " + dir);
 
-      // Set the parameters in the persistent storage
-      Config.getInstance().setConfig("dir", dir);
-      Config.getInstance().setConfig("dbfilename", dbfilename);
+        // Set the parameters in the persistent storage
+        Config.getInstance().setConfig("dir", dir);
+        Config.getInstance().setConfig("dbfilename", dbfilename);
 
-      // Read the RDB file
+        // Read the RDB file
         try {
-            RDBReader.readRDBFile(dir, dbfilename);
+          RDBReader.readRDBFile(dir, dbfilename);
         } catch (IOException e) {
-            System.err.println("IOException: " + e.getMessage());
+          System.err.println("IOException: " + e.getMessage());
         }
     }
-
 
     ServerSocket serverSocket = null;
 
