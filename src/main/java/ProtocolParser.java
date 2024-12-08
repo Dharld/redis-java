@@ -214,7 +214,13 @@ public class ProtocolParser {
             // We are dealing with a replica
             return "$10\r\nrole:slave\r\n";
         }
-        return "$11\r\nrole:master\r\n";
+
+        String replicationId = Master.getInstance().getReplicationId();
+        int replicationOffset = Master.getInstance().getReplicationOffset();
+
+        String info = String.format("role:master\r\nmaster_replid:%s\r\nmaster_repl_offset:%d", replicationId, replicationOffset);
+        logger.info(info);
+        return "$" + info.length() + "\r\n" + info + "\r\n";
     }
     private static String handleUnknownCommand() {
         logger.warning("Handling unknown command");

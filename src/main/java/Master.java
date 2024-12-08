@@ -7,10 +7,15 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 public class Master {
-    private static String role = "master";
+    private String role = "master";
     private static ServerSocket serverSocket = null;
+    private String replicationId;
+    private int replicationOffset = 0;
+    private static Master instance = new Master();
 
-    public Master() {}
+    private Master() {
+        this.replicationId = generateRandomString();
+    }
 
     public void initialize(int PORT) {
         // Threadpool to handle multiple clients
@@ -30,8 +35,7 @@ public class Master {
                 threadPool.submit(task);
             }
 
-        } catch (
-                IOException e) {
+        } catch (IOException e) {
             System.err.println("IOException: " + e.getMessage());
         } finally {
             if (threadPool != null && !threadPool.isShutdown()) {
@@ -40,7 +44,7 @@ public class Master {
         }
     }
 
-    private static void process(Socket clientSocket) {
+    private void process(Socket clientSocket) {
         // Open the input and output streams
         try (OutputStream out = clientSocket.getOutputStream();
              InputStream in = clientSocket.getInputStream();)
@@ -73,5 +77,27 @@ public class Master {
             }
         }
     }
+
+    private String generateRandomString() {
+        return "8371b4fb1155b71f4a04d3e1bc3e18c4a990aeeb";
+    }
+
+    public static Master getInstance() {
+        return instance;
+    }
+
+    public String getReplicationId() {
+        return replicationId;
+    }
+
+    public int getReplicationOffset() {
+        return replicationOffset;
+    }
+
+    public String getRole() {
+        return role;
+    }
+
+
 
 }

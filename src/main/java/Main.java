@@ -8,20 +8,20 @@ public class Main {
 
   private static void processArgument(String arg, String value) {
     switch (arg) {
-        case "--port":
+        case "port":
             int port = Integer.parseInt(value);
             logger.config("PORT: " + port);
             Config.getInstance().setConfig("port", Integer.toString(port));
             break;
-        case "--dir":
+        case "dir":
             logger.config("dir: " + value);
             Config.getInstance().setConfig("dir", value);
             break;
-        case "--dbfilename":
+        case "dbfilename":
             logger.config("dbfilename: " + value);
             Config.getInstance().setConfig("dbfilename", value);
             break;
-        case "--replicaof":
+        case "replicaof":
             logger.config("replicaof: " + value);
             Config.getInstance().setConfig("replicaof", value);
             break;
@@ -37,9 +37,9 @@ public class Main {
         logger.config("args[" + i + "]: " + args[i]);
         // Process all the arguments
         if (args[i].startsWith("--")) {
-            String arg = args[i];
+            String argument = args[i].split("--")[1];
             String value = args[i + 1];
-            processArgument(arg, value);
+            processArgument(argument, value);
         }
     }
 
@@ -75,8 +75,13 @@ public class Main {
           port = Integer.parseInt(config.getConfig("port"));
       }
       logger.info("Starting as master on port: " + port);
-      Master master = new Master();
-      master.initialize(port);
+      Master.getInstance().initialize(port);
+
+      // Store the master server to the config
+      config.setPortToServer(port, Master.getInstance());
+
+
+
 
   }
 }
