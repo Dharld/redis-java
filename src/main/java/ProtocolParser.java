@@ -209,7 +209,7 @@ public class ProtocolParser {
     private static String handleInfoCommand(String[] parts) {
         logger.info("Handling INFO command with parts: " + Arrays.toString(parts));
 
-        return "+INFO\r\n";
+        return "$11\r\nrole:master\r\n";
     }
     private static String handleUnknownCommand() {
         logger.warning("Handling unknown command");
