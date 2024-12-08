@@ -209,6 +209,11 @@ public class ProtocolParser {
     private static String handleInfoCommand(String[] parts) {
         logger.info("Handling INFO command with parts: " + Arrays.toString(parts));
 
+        // Check if we have the --replicaof flag
+        if (Config.getInstance().getConfig("replicaof") != null) {
+            // We are dealing with a replica
+            return "$10\r\nrole:slave\r\n";
+        }
         return "$11\r\nrole:master\r\n";
     }
     private static String handleUnknownCommand() {
