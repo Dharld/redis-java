@@ -14,6 +14,7 @@ public class ProtocolParser {
     private static final String SET_COMMAND = "SET";
     private static final String CONFIG_COMMAND = "CONFIG";
     private static final String KEY_COMMAND = "KEYS";
+    private static final String INFO_COMMAND = "INFO";
 
     // Get the singleton instance of the RedisServer
     private static final Database redisServer = Database.getInstance();
@@ -61,6 +62,11 @@ public class ProtocolParser {
         else if (uppercasedCommand.contains(KEY_COMMAND)) {
             return handleKeyCommand(parts);
         }
+
+        else if (uppercasedCommand.contains(INFO_COMMAND)) {
+            return handleInfoCommand(parts);
+        }
+
         // Check if the command contains an unknown command
         else {
             return handleUnknownCommand();
@@ -200,6 +206,11 @@ public class ProtocolParser {
         return String.format("*%d\r\n%s", keys.length, filteredKeys);
     }
 
+    private static String handleInfoCommand(String[] parts) {
+        logger.info("Handling INFO command with parts: " + Arrays.toString(parts));
+
+        return "+INFO\r\n";
+    }
     private static String handleUnknownCommand() {
         logger.warning("Handling unknown command");
         return "-ERR unknown command";

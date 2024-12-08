@@ -9,6 +9,9 @@ public class Config {
     // Store to hold the key-value pairs
     private final Map<String, String> config = new ConcurrentHashMap<>();
 
+    // Hashmap to store the servers along with their ports
+    private final Map<Integer, Object> portToServer = new ConcurrentHashMap<>();
+
     private Logger logger = Logger.getLogger(Config.class.getName());
 
     private Config() {
@@ -28,6 +31,9 @@ public class Config {
 //        this.printConfig();
     }
 
+    public void setPortToServer(int port, Object server) {
+        this.portToServer.put(port, server);
+    }
 
     public String getConfig(String key) {
 //        logger.info("Getting key: " + key);
