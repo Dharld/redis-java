@@ -12,6 +12,7 @@ public class Master {
     private String replicationId;
     private int replicationOffset = 0;
     private static Master instance = new Master();
+    private int[] replicaPorts = {};
 
     private Master() {
         this.replicationId = generateRandomString();
@@ -98,6 +99,12 @@ public class Master {
         return role;
     }
 
+    public void addToReplicaPorts(int port) {
+        int[] newReplicaPorts = new int[replicaPorts.length + 1];
+        System.arraycopy(replicaPorts, 0, newReplicaPorts, 0, replicaPorts.length);
+        newReplicaPorts[replicaPorts.length] = port;
+        replicaPorts = newReplicaPorts;
+    }
 
 
 }

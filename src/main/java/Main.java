@@ -68,17 +68,21 @@ public class Main {
         }
     }
 
-    if(isReplica) {
+    // Check if the server is a replica
+    // If it is, then connect to the master
+
+      if(isReplica) {
         logger.info("Starting as replica of: " + masterHost + " " + masterPort);
         // Create a new replica
-        Replica replica = new Replica(masterHost, masterPort);
-        replica.initialize(masterHost, masterPort);
+        // Get the replica port
+        int replicaPort = Integer.parseInt(config.getConfig("port"));
+        Replica replica = new Replica(masterHost, masterPort, replicaPort);
+        replica.connectToMaster();
+
     }
 
     int port = config.getConfig("port") != null ? Integer.parseInt(config.getConfig("port")) : 6379;
     Master.getInstance().initialize(port);
 
   }
-
-
 }

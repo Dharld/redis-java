@@ -3,18 +3,31 @@ import java.util.Locale;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
 
+enum Command {
+    ECHO("ECHO"),
+    PING("PING"),
+    GET("GET"),
+    SET("SET"),
+    CONFIG("CONFIG"),
+    KEYS("KEYS"),
+    INFO("INFO"),
+    REPLCONF("REPLCONF");
+
+    private final String command;
+
+    Command(String command) {
+        this.command = command;
+    }
+
+    public String getCommand() {
+        return command;
+    }
+}
+
 // This is the protocol parser used to parse the commands
 public class ProtocolParser {
 
     private static final Logger logger = Logger.getLogger(ProtocolParser.class.getName());
-
-    private static final String ECHO_COMMAND = "ECHO";
-    private static final String PING_COMMAND = "PING";
-    private static final String GET_COMMAND = "GET";
-    private static final String SET_COMMAND = "SET";
-    private static final String CONFIG_COMMAND = "CONFIG";
-    private static final String KEY_COMMAND = "KEYS";
-    private static final String INFO_COMMAND = "INFO";
 
     // Get the singleton instance of the RedisServer
     private static final Database redisServer = Database.getInstance();
@@ -40,31 +53,35 @@ public class ProtocolParser {
         logger.info("Command parts: " + Arrays.toString(parts));
 
         // Check if the command contains the PING command
-        if (uppercasedCommand.contains(PING_COMMAND)) {
+        if (uppercasedCommand.contains(Command.PING.getCommand())) {
             return handlePingCommand();
         }
         // Check if the command contains the ECHO command
-        else if (uppercasedCommand.contains(ECHO_COMMAND)) {
+        else if (uppercasedCommand.contains(Command.ECHO.getCommand())) {
             return handleEchoCommand(parts);
         }
-        else if (uppercasedCommand.contains(CONFIG_COMMAND)) {
+        else if (uppercasedCommand.contains(Command.CONFIG.getCommand())) {
             return handleConfigCommand(parts);
         }
 
-        else if (uppercasedCommand.contains(GET_COMMAND)) {
+        else if (uppercasedCommand.contains(Command.GET.getCommand())) {
             return handleGetCommand(parts);
         }
 
-        else if (uppercasedCommand.contains(SET_COMMAND)) {
+        else if (uppercasedCommand.contains(Command.SET.getCommand())) {
             return handleSetCommand(parts);
         }
 
-        else if (uppercasedCommand.contains(KEY_COMMAND)) {
+        else if (uppercasedCommand.contains(Command.KEYS.getCommand())) {
             return handleKeyCommand(parts);
         }
 
-        else if (uppercasedCommand.contains(INFO_COMMAND)) {
+        else if (uppercasedCommand.contains(Command.INFO.getCommand())) {
             return handleInfoCommand(parts);
+        }
+
+        else if(uppercasedCommand.contains(Command.REPLCONF.getCommand())) {
+            return handleReplicaCommand(parts);
         }
 
         // Check if the command contains an unknown command
@@ -220,8 +237,15 @@ public class ProtocolParser {
 
         String info = String.format("role:master\r\nmaster_replid:%s\r\nmaster_repl_offset:%d", replicationId, replicationOffset);
         logger.info(info);
+
         return "$" + info.length() + "\r\n" + info + "\r\n";
     }
+
+    private static String handleReplicaCommand(String[] parts) {
+        logger.info("Handling REPLCONF command with parts: " + Arrays.toString(parts));
+        return "+OK\r\n";
+    }
+
     private static String handleUnknownCommand() {
         logger.warning("Handling unknown command");
         return "-ERR unknown command";
