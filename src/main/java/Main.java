@@ -77,11 +77,9 @@ public class Main {
         // Get the replica port
         Replica replica = new Replica(masterHost, masterPort);
         replica.connectToMaster();
+      }
 
-    }
-
-    int port = config.getConfig("port") != null ? Integer.parseInt(config.getConfig("port")) : 6379;
-    Master.getInstance().initialize(port);
-
+      int port = config.getConfig("port") != null ? Integer.parseInt(config.getConfig("port")) : 6379;
+      Master.getInstance().initialize(port);
   }
 }

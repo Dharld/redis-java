@@ -1,29 +1,11 @@
+import utils.Command;
+
+import java.io.IOException;
+import java.io.OutputStream;
 import java.util.Arrays;
+import java.util.HexFormat;
 import java.util.Locale;
-import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
-
-enum Command {
-    ECHO("ECHO"),
-    PING("PING"),
-    GET("GET"),
-    SET("SET"),
-    CONFIG("CONFIG"),
-    KEYS("KEYS"),
-    INFO("INFO"),
-    REPLCONF("REPLCONF"),
-    PSYNC("PSYNC");
-
-    private final String command;
-
-    Command(String command) {
-        this.command = command;
-    }
-
-    public String getCommand() {
-        return command;
-    }
-}
 
 // This is the protocol parser used to parse the commands
 public class ProtocolParser {
@@ -36,7 +18,8 @@ public class ProtocolParser {
     // Get the persistent storage instance
     private static final Config CONFIG = Config.getInstance();
 
-    public static String parse(String command) {
+    public static String parse(String command, OutputStream out) throws IOException {
+
         logger.info("Received command: " + command);
 
         if (command == null || command.isEmpty()) {
@@ -54,45 +37,46 @@ public class ProtocolParser {
         logger.info("Command parts: " + Arrays.toString(parts));
 
         // Check if the command contains the PING command
-        if (uppercasedCommand.contains(Command.PING.getCommand())) {
+        if (uppercasedCommand.contains(Command.PING.toString())) {
             return handlePingCommand();
         }
         // Check if the command contains the ECHO command
-        else if (uppercasedCommand.contains(Command.ECHO.getCommand())) {
+        else if (uppercasedCommand.contains(Command.ECHO.toString())) {
             return handleEchoCommand(parts);
         }
-        else if (uppercasedCommand.contains(Command.CONFIG.getCommand())) {
+
+        else if (uppercasedCommand.contains(Command.CONFIG.toString())) {
             return handleConfigCommand(parts);
         }
 
-        else if (uppercasedCommand.contains(Command.GET.getCommand())) {
+        else if (uppercasedCommand.contains(Command.GET.toString())) {
             return handleGetCommand(parts);
         }
 
-        else if (uppercasedCommand.contains(Command.SET.getCommand())) {
+        else if (uppercasedCommand.contains(Command.SET.toString())) {
             return handleSetCommand(parts);
         }
 
-        else if (uppercasedCommand.contains(Command.KEYS.getCommand())) {
+        else if (uppercasedCommand.contains(Command.KEYS.toString())) {
             return handleKeyCommand(parts);
         }
 
-        else if (uppercasedCommand.contains(Command.INFO.getCommand())) {
+        else if (uppercasedCommand.contains(Command.INFO.toString())) {
             return handleInfoCommand(parts);
         }
 
-        else if(uppercasedCommand.contains(Command.REPLCONF.getCommand())) {
-            return handleReplicaCommand(parts);
+        else if(uppercasedCommand.contains(Command.REPLCONF.toString())) {
+            return Master.handleReplicaCommand(parts);
         }
 
-        else if(uppercasedCommand.contains(Command.PSYNC.getCommand())) {
-            return handlePsyncCommand(parts);
+        else if(uppercasedCommand.contains(Command.PSYNC.toString())) {
+            return Master.handlePsyncCommand(parts, out);
         }
 
-        // Check if the command contains an unknown command
         else {
             return handleUnknownCommand();
         }
+
     }
 
     private static String handlePingCommand() {
@@ -246,32 +230,6 @@ public class ProtocolParser {
         return "$" + info.length() + "\r\n" + info + "\r\n";
     }
 
-    private static String handleReplicaCommand(String[] parts) {
-        logger.info("Handling REPLCONF command with parts: " + Arrays.toString(parts));
-        return "+OK\r\n";
-    }
-
-    private static String handlePsyncCommand(String[] parts) {
-        logger.info("Handling PSYNC command with parts: " + Arrays.toString(parts));
-
-        // Get the replication ID and the offset
-        String replicationId = parts[1];
-        int offset = Integer.parseInt(parts[3]);
-
-        logger.info("Replication ID: " + replicationId);
-        logger.info("Offset: " + offset);
-
-       // Set the replication ID and the offset
-        if (replicationId.equals("?")) {
-            // Return
-            logger.info("Replication ID is not equal to ?");
-            String fullResyncResponse = String.format("+FULLRESYNC %s %d", Master.getInstance().getReplicationId(), Master.getInstance().getReplicationOffset());
-            return "$" + fullResyncResponse.length() + "\r\n" + fullResyncResponse + "\r\n";
-        }
-
-        // Return the response to the user
-        return "+OK\r\n";
-    }
     private static String handleUnknownCommand() {
         logger.warning("Handling unknown command");
         return "-ERR unknown command";
