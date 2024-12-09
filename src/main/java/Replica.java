@@ -40,35 +40,32 @@ public class Replica {
 
     private void handleReplConf(OutputStream out, BufferedReader in) throws IOException {
         try {
-            // Send the first REPLCONF command
-            String listeningCommand = ReplicaCommand.REPLCONF_LISTENING_PORT.getCommand(6380);
-            String capaCommand = ReplicaCommand.REPLCONF_CAPA.getCommand();
-            String psyncCommand = ReplicaCommand.REPLCONF_PSYNC.getCommand();
-
-            sendReplConfCommand(out, listeningCommand);
-            if (isResponseOk(in)) {
-                logger.info("First REPLCONF command successful");
-                // Send the second REPLCONF command
-                sendReplConfCommand(out, capaCommand);
-                if (isResponseOk(in)) {
-                    logger.info("Second REPLCONF command successful");
-                    // Send the PSYNC command
-                    sendReplConfCommand(out, psyncCommand);
-                    if (isResponseOk(in)) {
-                        logger.info("PSYNC command successful");
-                    } else {
-                        logger.severe("PSYNC command failed");
-                    }
-                } else {
-                    logger.severe("Second REPLCONF command failed");
-                }
-            } else {
+            if (!executeReplConfCommand(out, in, ReplicaCommand.REPLCONF_LISTENING_PORT.getCommand(6380))) {
                 logger.severe("First REPLCONF command failed");
+                return;
             }
+            logger.info("First REPLCONF command successful");
+
+            if (!executeReplConfCommand(out, in, ReplicaCommand.REPLCONF_CAPA.getCommand())) {
+                logger.severe("Second REPLCONF command failed");
+                return;
+            }
+            logger.info("Second REPLCONF command successful");
+
+            if (!executeReplConfCommand(out, in, ReplicaCommand.REPLCONF_PSYNC.getCommand())) {
+                logger.severe("PSYNC command failed");
+                return;
+            }
+            logger.info("PSYNC command successful");
         } catch (IOException e) {
             logger.severe("IOException occurred while handling REPLCONF: " + e.getMessage());
             throw e;
         }
+    }
+
+    private boolean executeReplConfCommand(OutputStream out, BufferedReader in, String command) throws IOException {
+        sendReplConfCommand(out, command);
+        return isResponseOk(in);
     }
 
     public void connectToMaster() {
