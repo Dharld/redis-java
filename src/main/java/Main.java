@@ -75,8 +75,7 @@ public class Main {
         logger.info("Starting as replica of: " + masterHost + " " + masterPort);
         // Create a new replica
         // Get the replica port
-        int replicaPort = Integer.parseInt(config.getConfig("port"));
-        Replica replica = new Replica(masterHost, masterPort, replicaPort);
+        Replica replica = new Replica(masterHost, masterPort);
         replica.connectToMaster();
 
     }

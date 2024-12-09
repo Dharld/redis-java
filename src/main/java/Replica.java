@@ -1,12 +1,11 @@
 import java.io.*;
-import java.net.ServerSocket;
 import java.net.Socket;
-import java.util.Scanner;
 import java.util.logging.Logger;
 
 enum ReplicaCommand {
     REPLCONF_LISTENING_PORT("*3\r\n$8\r\nREPLCONF\r\n$14\r\nlistening-port\r\n$4\r\n%s\r\n"),
-    REPLCONF_PSYNC("*3\r\n$8\r\nREPLCONF\r\n$4\r\ncapa\r\n$6\r\npsync2\r\n");
+    REPLCONF_CAPA("*3\r\n$8\r\nREPLCONF\r\n$4\r\ncapa\r\n$6\r\npsync2\r\n"),
+    REPLCONF_PSYNC("*3\r\n$5\r\nPSYNC\r\n$1\r\n?\r\n$2\r\n-1\r\n");
 
     private final String command;
 
@@ -23,12 +22,10 @@ public class Replica {
     private static final Logger logger = Logger.getLogger(Replica.class.getName());
     private String masterAddress;
     private int masterPort;
-    private int replicaPort = 0;
 
-    public Replica(String masterAddress, int masterPort, int replicaPort) {
+    public Replica(String masterAddress, int masterPort) {
         this.masterAddress = masterAddress;
         this.masterPort = masterPort;
-        this.replicaPort = replicaPort;
     }
 
     private void sendReplConfCommand(OutputStream out, String command) throws IOException {
@@ -43,19 +40,25 @@ public class Replica {
 
     private void handleReplConf(OutputStream out, BufferedReader in) throws IOException {
         try {
-            System.out.println("Handling REPLCONF");
-
             // Send the first REPLCONF command
-            String listeningCommand = ReplicaCommand.REPLCONF_LISTENING_PORT.getCommand(replicaPort);
+            String listeningCommand = ReplicaCommand.REPLCONF_LISTENING_PORT.getCommand(6380);
+            String capaCommand = ReplicaCommand.REPLCONF_CAPA.getCommand();
             String psyncCommand = ReplicaCommand.REPLCONF_PSYNC.getCommand();
 
             sendReplConfCommand(out, listeningCommand);
             if (isResponseOk(in)) {
                 logger.info("First REPLCONF command successful");
                 // Send the second REPLCONF command
-                sendReplConfCommand(out, psyncCommand);
+                sendReplConfCommand(out, capaCommand);
                 if (isResponseOk(in)) {
                     logger.info("Second REPLCONF command successful");
+                    // Send the PSYNC command
+                    sendReplConfCommand(out, psyncCommand);
+                    if (isResponseOk(in)) {
+                        logger.info("PSYNC command successful");
+                    } else {
+                        logger.severe("PSYNC command failed");
+                    }
                 } else {
                     logger.severe("Second REPLCONF command failed");
                 }
@@ -97,23 +100,7 @@ public class Replica {
         }
     }
 
-    public void startReplica() {
-        // Create a server at replica port
-        try (ServerSocket serverSocket = new ServerSocket(replicaPort)) {
-            logger.info("Replica server started at port: " + replicaPort);
-            while (true) {
-                // Accept incoming connections
-                Socket clientSocket = serverSocket.accept();
-                logger.info("Accepted connection from: " + clientSocket.getInetAddress().getHostAddress());
-                // Span a new thread to handle the new client
-                Runnable task = () -> {};
 
-                new Thread(task).start();
-            }
-        } catch (IOException e) {
-            logger.severe("IOException: " + e.getMessage());
-        }
-    }
 
 
 }
