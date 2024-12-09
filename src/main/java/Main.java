@@ -32,6 +32,10 @@ public class Main {
   }
 
   public static void main(String[] args) {
+  boolean isReplica = false;
+  int masterPort = 0;
+  String masterHost = null;
+
     // Get the port number
     for (int i = 0; i < args.length; i++) {
         logger.config("args[" + i + "]: " + args[i]);
@@ -39,6 +43,13 @@ public class Main {
         if (args[i].startsWith("--")) {
             String argument = args[i].split("--")[1];
             String value = args[i + 1];
+
+            if (argument.equals("replicaof")) {
+                isReplica = true;
+                masterHost = value.split(" ")[0];
+                masterPort = Integer.parseInt(value.split(" ")[1]);
+            }
+
             processArgument(argument, value);
         }
     }
@@ -57,31 +68,17 @@ public class Main {
         }
     }
 
-    initialize();
+    if(isReplica) {
+        logger.info("Starting as replica of: " + masterHost + " " + masterPort);
+        // Create a new replica
+        Replica replica = new Replica(masterHost, masterPort);
+        replica.initialize(masterHost, masterPort);
+    }
+
+    int port = config.getConfig("port") != null ? Integer.parseInt(config.getConfig("port")) : 6379;
+    Master.getInstance().initialize(port);
 
   }
 
-  private static void initialize() {
-      Config config = Config.getInstance();
 
-      // Create either a replica or a master based on the configuration
-      if (config.getConfig("replicaof") != null) {
-          String replicaOf = config.getConfig("replicaof");
-          logger.info("Starting as replica of: " + replicaOf);
-      }
-
-      int port = 6379;
-      if (config.getConfig("port") != null) {
-          port = Integer.parseInt(config.getConfig("port"));
-      }
-      logger.info("Starting as master on port: " + port);
-      Master.getInstance().initialize(port);
-
-      // Store the master server to the config
-      config.setPortToServer(port, Master.getInstance());
-
-
-
-
-  }
 }
