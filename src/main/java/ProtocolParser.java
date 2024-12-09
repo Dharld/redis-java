@@ -11,7 +11,8 @@ enum Command {
     CONFIG("CONFIG"),
     KEYS("KEYS"),
     INFO("INFO"),
-    REPLCONF("REPLCONF");
+    REPLCONF("REPLCONF"),
+    PSYNC("PSYNC");
 
     private final String command;
 
@@ -82,6 +83,10 @@ public class ProtocolParser {
 
         else if(uppercasedCommand.contains(Command.REPLCONF.getCommand())) {
             return handleReplicaCommand(parts);
+        }
+
+        else if(uppercasedCommand.contains(Command.PSYNC.getCommand())) {
+            return handlePsyncCommand(parts);
         }
 
         // Check if the command contains an unknown command
@@ -246,6 +251,27 @@ public class ProtocolParser {
         return "+OK\r\n";
     }
 
+    private static String handlePsyncCommand(String[] parts) {
+        logger.info("Handling PSYNC command with parts: " + Arrays.toString(parts));
+
+        // Get the replication ID and the offset
+        String replicationId = parts[1];
+        int offset = Integer.parseInt(parts[3]);
+
+        logger.info("Replication ID: " + replicationId);
+        logger.info("Offset: " + offset);
+
+       // Set the replication ID and the offset
+        if (replicationId.equals("?")) {
+            // Return
+            logger.info("Replication ID is not equal to ?");
+            String fullResyncResponse = String.format("+FULLRESYNC %s %d", Master.getInstance().getReplicationId(), Master.getInstance().getReplicationOffset());
+            return "$" + fullResyncResponse.length() + "\r\n" + fullResyncResponse + "\r\n";
+        }
+
+        // Return the response to the user
+        return "+OK\r\n";
+    }
     private static String handleUnknownCommand() {
         logger.warning("Handling unknown command");
         return "-ERR unknown command";
