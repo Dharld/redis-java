@@ -1,4 +1,5 @@
-import utils.ReplicaCommand;
+import RESP.RESPEncoder;
+import core.ServerConfig;
 
 import java.io.*;
 import java.net.Socket;
@@ -8,83 +9,74 @@ import java.util.logging.Logger;
 
 public class Replica {
     private static final Logger logger = Logger.getLogger(Replica.class.getName());
-    private String masterAddress;
-    private int masterPort;
+    private Socket socket;
+    private int port;
+    private ServerConfig config;
 
-    public Replica(String masterAddress, int masterPort) {
-        this.masterAddress = masterAddress;
-        this.masterPort = masterPort;
+    public Replica(Socket socket, int port, ServerConfig config) {
+        this.socket = socket;
+        this.port = port;
+        this.config = config;
     }
 
-    private void sendReplConfCommand(OutputStream out, String command) throws IOException {
-        out.write(command.getBytes());
-        out.flush();
-    }
-
-    private boolean isResponseOk(BufferedReader in) throws IOException {
-        String response = in.readLine();
-        return response.equals("+OK");
-    }
-
-    private void handleReplConf(OutputStream out, BufferedReader in) throws IOException {
-        try {
-            if (!executeReplConfCommand(out, in, ReplicaCommand.REPLCONF_LISTENING_PORT.getCommand(6380))) {
-                logger.severe("First REPLCONF command failed");
-                return;
-            }
-            logger.info("First REPLCONF command successful");
-
-            if (!executeReplConfCommand(out, in, ReplicaCommand.REPLCONF_CAPA.getCommand())) {
-                logger.severe("Second REPLCONF command failed");
-                return;
-            }
-            logger.info("Second REPLCONF command successful");
-
-            if (!executeReplConfCommand(out, in, ReplicaCommand.REPLCONF_PSYNC.getCommand())) {
-                logger.severe("PSYNC command failed");
-                return;
-            }
-            logger.info("PSYNC command successful");
-        } catch (IOException e) {
-            logger.severe("IOException occurred while handling REPLCONF: " + e.getMessage());
-            throw e;
-        }
-    }
-
-    private boolean executeReplConfCommand(OutputStream out, BufferedReader in, String command) throws IOException {
-        sendReplConfCommand(out, command);
-        return isResponseOk(in);
-    }
-
-    public void connectToMaster() {
-        try(Socket socket = new Socket(masterAddress, masterPort)) {
+    public void start() {
+        try(
             // Get channels to communicate with the master
             OutputStream out = socket.getOutputStream();
-            BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+            InputStream in = socket.getInputStream();
+        ) {
 
-            // Send a *1\r\n$4\r\nPING\r\n command to the master in resp format
-            out.write("*1\r\n$4\r\nPING\r\n".getBytes());
-            out.flush();
+            // Handshake 1/3
+            sendPing(out);
+            readMasterResponse(in);
 
-            // Read the response from the master
-            String response = in.readLine();
+            // Handshake 2/3
+            int masterPort = config.getConfig("masterPort") != null ? Integer.parseInt(config.getConfig("masterPort")) : 6379;
+            sendReplConf(out, masterPort);
+            readMasterResponse(in);
 
-            // Send first REPLCONF
-            if(response.equals("+PONG")) {
-                handleReplConf(out, in);
-            }
+            // Handshake 3/3
+            sendPsync(out);
+            readMasterResponse(in);
 
-            // Log the response
-            logger.info("Response from master: " + response);
-
-            // Connect to the master
-            logger.info("Connected to master at " + masterAddress + ":" + masterPort);
             // Handle replication logic here
         } catch (IOException e) {
             logger.severe("Failed to connect to master: " + e.getMessage());
         }
     }
 
+    private void sendPing(OutputStream outputStream) throws IOException {
+        System.out.println("Sending PING to master...");
+        // Send a PING request
+        String pingRequest = RESPEncoder.encodeArray(new String[] {"PING"});
+        outputStream.write(pingRequest.getBytes());
+    }
+
+    private void sendReplConf(OutputStream outputStream, int port) throws IOException {
+        System.out.println("Sending REPL config to master...");
+        String firstRequest = RESPEncoder.encodeArray(new String[] {"REPLCONF", "listening-port", String.valueOf(port)});
+        outputStream.write(firstRequest.getBytes());
+        String secondRequest = RESPEncoder.encodeArray(new String[] {"REPLCONF", "capa", "psync2"});
+        outputStream.write(secondRequest.getBytes());
+    }
+
+    private void sendPsync(OutputStream outputStream) throws IOException {
+        System.out.println("Sending PSYNC to master...");
+        String request = RESPEncoder.encodeArray(new String[] {"PSYNC", "?", "-1"});
+        outputStream.write(request.getBytes());
+    }
+
+    private void readMasterResponse(InputStream inputStream) throws IOException {
+        byte[] buffer = new byte[56];
+        int bytesRead = inputStream.read(buffer);
+
+        if (bytesRead > 0) {
+            String response = new String(buffer, 0 , bytesRead);
+            System.out.println("Received response from master: " + response);
+        } else {
+            System.out.println("No bytes read from input stream");
+        }
+    }
 
 
 

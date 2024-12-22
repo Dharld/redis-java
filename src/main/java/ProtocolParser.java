@@ -1,9 +1,10 @@
+import RESP.RESPEncoder;
+import core.ServerConfig;
 import utils.Command;
 
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.Arrays;
-import java.util.HexFormat;
 import java.util.Locale;
 import java.util.logging.Logger;
 
@@ -15,10 +16,21 @@ public class ProtocolParser {
     // Get the singleton instance of the RedisServer
     private static final Database redisServer = Database.getInstance();
 
-    // Get the persistent storage instance
-    private static final Config CONFIG = Config.getInstance();
 
-    public static String parse(String command, OutputStream out) throws IOException {
+    private OutputStream out;
+
+    private Master master;
+
+    private ServerConfig config;
+
+
+    public ProtocolParser(OutputStream out, Master master, ServerConfig config) {
+        this.out = out;
+        this.master = master;
+        this.config = config;
+    }
+
+    public String parse(String command) throws IOException {
 
         logger.info("Received command: " + command);
 
@@ -66,11 +78,11 @@ public class ProtocolParser {
         }
 
         else if(uppercasedCommand.contains(Command.REPLCONF.toString())) {
-            return Master.handleReplicaCommand(parts);
+            return master.handleReplicaCommand(parts);
         }
 
         else if(uppercasedCommand.contains(Command.PSYNC.toString())) {
-            return Master.handlePsyncCommand(parts, out);
+            return master.handlePsyncCommand(parts, out);
         }
 
         else {
@@ -79,12 +91,12 @@ public class ProtocolParser {
 
     }
 
-    private static String handlePingCommand() {
+    private  String handlePingCommand() {
         logger.info("Handling PING command");
         return "+PONG\r\n";
     }
 
-    private static String handleSetCommand(String[] parts) {
+    private  String handleSetCommand(String[] parts) {
         logger.info("Handling SET command with parts: " + Arrays.toString(parts));
 
         // Get the key length and the key
@@ -127,7 +139,7 @@ public class ProtocolParser {
         return "+OK\r\n";
     }
 
-    private static String handleGetCommand(String[] parts) {
+    private  String handleGetCommand(String[] parts) {
         logger.info("Handling GET command with parts: " + Arrays.toString(parts));
 
         // Get the key length and the key
@@ -148,7 +160,7 @@ public class ProtocolParser {
         return "$" + value.length() + "\r\n" + value + "\r\n";
     }
 
-    private static String handleEchoCommand(String[] parts) {
+    private  String handleEchoCommand(String[] parts) {
         logger.info("Handling ECHO command with parts: " + Arrays.toString(parts));
 
         // Return the numCharacters first characters of the last part
@@ -159,7 +171,7 @@ public class ProtocolParser {
         return "$" + lastPart.length() + "\r\n" + lastPart + "\r\n";
     }
 
-    private static String handleConfigCommand(String[] parts) {
+    private  String handleConfigCommand(String[] parts) {
         logger.info("Handling CONFIG command with parts: " + Arrays.toString(parts));
 
         // Get the command and parameter ([$3, GET, $3, dir])
@@ -168,7 +180,7 @@ public class ProtocolParser {
 
         // If the command is GET
         if (command.equalsIgnoreCase("GET")) {
-            String value = CONFIG.getConfig(parameter);
+            String value = config.getConfig(parameter);
 
             // If there's no value associated with the parameter
             if (value == null) {
@@ -182,7 +194,7 @@ public class ProtocolParser {
         return "-ERR unknown command";
     }
 
-    private static String handleKeyCommand(String[] parts) {
+    private String handleKeyCommand(String[] parts) {
         logger.info("Handling KEYS command with * parts: " + Arrays.toString(parts));
         logger.info("Test");
 
@@ -212,22 +224,22 @@ public class ProtocolParser {
         return String.format("*%d\r\n%s", keys.length, filteredKeys);
     }
 
-    private static String handleInfoCommand(String[] parts) {
+    private String handleInfoCommand(String[] parts) {
         logger.info("Handling INFO command with parts: " + Arrays.toString(parts));
 
         // Check if we have the --replicaof flag
-        if (Config.getInstance().getConfig("replicaof") != null) {
+        if (config.isSlave()) {
             // We are dealing with a replica
-            return "$10\r\nrole:slave\r\n";
+            return RESPEncoder.encodeString("role:replica");
         }
 
-        String replicationId = Master.getInstance().getReplicationId();
-        int replicationOffset = Master.getInstance().getReplicationOffset();
+        String replicationId = master.getReplicationId();
+        int replicationOffset = master.getReplicationOffset();
 
         String info = String.format("role:master\r\nmaster_replid:%s\r\nmaster_repl_offset:%d", replicationId, replicationOffset);
         logger.info(info);
 
-        return "$" + info.length() + "\r\n" + info + "\r\n";
+        return RESPEncoder.encodeString(info);
     }
 
     private static String handleUnknownCommand() {
